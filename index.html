@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
-<title>SHIFT TRIP — a tiny dream you can walk in</title>
+<title>DREAM SHIFT — a tiny dream you can walk in</title>
 <style>
 *{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:#1a0b2e;font-family:system-ui,'Segoe UI',sans-serif}
-canvas#c{display:block;width:100vw;height:100vh}
+canvas#c{display:block;width:100vw;height:100vh;transition:transform 1s ease}
 button{font-family:inherit;cursor:pointer}
 /* ---------- INTRO ---------- */
 #intro{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;background:linear-gradient(rgba(26,11,46,.74),rgba(26,11,46,.74)),url('assets/hero.jpg') center/cover;color:#fff}
@@ -38,7 +38,7 @@ kbd{background:#fff;color:#33184d;border-radius:6px;padding:1px 8px;font-weight:
 <!-- ============ INTRO / STORY ============ -->
 <div id="intro"><div id="introCard">
   <div id="art">😴🌙</div>
-  <h1>SHIFT TRIP</h1>
+  <h1>DREAM SHIFT</h1>
   <div id="tagline">a tiny dream you can walk in</div>
   <div id="story"></div>
   <div id="controlsBox">
@@ -57,12 +57,12 @@ kbd{background:#fff;color:#33184d;border-radius:6px;padding:1px 8px;font-weight:
 </div></div>
 
 <!-- ============ HUD ============ -->
-<div id="hud">🌈 <b>SHIFT TRIP</b> <span id="ng"></span><br>
+<div id="hud">🌈 <b>DREAM SHIFT</b> <span id="ng"></span><br>
 📍 <span id="zone"></span> · 🎥 <span id="view"></span> · 👤 <span id="sprite"></span><br>
 ⭐ <span id="score">0</span> · 🍩 <span id="donuts">0</span> · 🔮 <span id="orbs">0</span> · 👣 <span id="dist">0</span>m<br>
 🕹️ <span id="ctrl">Normal controls</span>
 <div>✨ Shift Meter</div><div class="bar"><div class="fill" id="fill"></div></div>
-<div>🌙 Trip Meter</div><div class="bar"><div class="fill2" id="fill2"></div></div></div>
+<div>🌙 Dream Meter</div><div class="bar"><div class="fill2" id="fill2"></div></div></div>
 <div id="banner"></div><div id="say"></div>
 <div id="paused">⏸ DREAM PAUSED</div>
 <button id="pauseBtn">⏸ Pause</button>
@@ -82,7 +82,7 @@ const cv=document.getElementById('c');
 const PAGES=[
  {a:'😴🌙',t:`<b>Milo</b> was a little dreamer with very big, very sleepy eyes.<br>Every night at exactly <b>3:33 AM</b>, Milo's pillow did something pillows are not supposed to do.<br><br>It whispered: <i>"psst… wanna go somewhere weird?"</i>`},
  {a:'🛏️✨',t:`One night, Milo said yes.<br>The bedroom folded up like a paper airplane, the ceiling turned into candy sky, and Milo fell — softly, slowly, giggling — <b>into the Dreamscape</b>.<br><br>There are no monsters here. No timers. No game over.<br>There is only… <b>the SHIFT</b>.`},
- {a:'🔮🌀',t:`In this dream, the <b>SHIFT</b> rewrites <i>everything</i>: the world, your body, the music, gravity, even the camera watching you.<br><br>Collect <b>Shift Orbs</b>, meet the Sleepy Moon and a talking traffic cone, and fill your <b>Trip Meter</b>.<br><br>How far can a dream shift before breakfast?`},
+ {a:'🔮🌀',t:`In this dream, the <b>SHIFT</b> rewrites <i>everything</i>: the world, your body, the music, gravity, even the camera watching you.<br><br>Collect <b>Shift Orbs</b>, meet the Sleepy Moon and a talking traffic cone, and fill your <b>Dream Meter</b>.<br><br>How far can a dream shift before breakfast?`},
  {a:'🎮💜',t:`<b>HOW TO PLAY</b> — it's easy, dreamer:`}];
 let page=0,started=false;
 function showPage(){el('story').innerHTML=PAGES[page].t;el('art').textContent=PAGES[page].a;el('dots').textContent=[0,1,2,3].map(i=>i<=page?'●':'○').join(' ');el('controlsBox').style.display=page===3?'block':'none';el('nextBtn').textContent=page===3?'🌙 START THE DREAM →':'Next ▸'}
@@ -134,9 +134,18 @@ const scene=new THREE.Scene();
 scene.fog=new THREE.FogExp2(0xff9de2,0.016);
 const camera=new THREE.PerspectiveCamera(72,innerWidth/innerHeight,0.1,400);
 camera.rotation.order='YXZ';
+/* ================= v3.2 — KALEIDOSCOPE render pass ================= */
+const kaleidoRT=new THREE.WebGLRenderTarget(640,360);
+const kaleidoMat=new THREE.ShaderMaterial({uniforms:{tDiffuse:{value:kaleidoRT.texture},uMix:{value:0},uSeg:{value:8}},
+ vertexShader:'varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}',
+ fragmentShader:'varying vec2 vUv;uniform sampler2D tDiffuse;uniform float uMix;uniform float uSeg;void main(){vec2 p=vUv-0.5;float r=length(p);float a=atan(p.y,p.x);float seg=6.2831853/uSeg;a=mod(a,seg);a=abs(a-seg*0.5);vec2 q=vec2(cos(a),sin(a))*r+0.5;vec3 n=texture2D(tDiffuse,vUv).rgb;vec3 k=texture2D(tDiffuse,q).rgb;gl_FragColor=vec4(mix(n,k,uMix),1.);}',
+ depthTest:false,depthWrite:false});
+const kaleidoScene=new THREE.Scene();
+kaleidoScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2,2),kaleidoMat));
+const kaleidoCam=new THREE.OrthographicCamera(-1,1,1,-1,0,1);
 const hemi=new THREE.HemisphereLight(0xfff0fa,0x884488,0.95);scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xffffff,1.1);sun.position.set(30,50,20);scene.add(sun);
-addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);kaleidoRT.setSize(Math.max(320,Math.floor(innerWidth/2)),Math.max(180,Math.floor(innerHeight/2)))});
 
 /* sky dome */
 const skyMat=new THREE.MeshBasicMaterial({color:0xffb7e6,side:THREE.BackSide,fog:false,depthWrite:false});
@@ -154,7 +163,7 @@ function curWallTex(){return texFor('w',themeIdx)||THEMES[themeIdx].wallTex||nul
 function curWallCol(){return THEMES[themeIdx].wallCol}
 /* perimeter ring */
 addWall(0,-60,122,7,1.5,14);addWall(0,60,122,7,1.5,14);addWall(-60,0,1.5,7,122,14);addWall(60,0,1.5,7,122,14);
-/* scattered monolith slabs (LSD standing stones) */
+/* scattered monolith slabs (dream standing stones) */
 const MONO=[[-38,-30,7,6],[-24,18,5,7],[14,-38,6,5],[30,8,8,6],[42,-22,5,8],[-8,34,7,5],[8,44,5,6],[-46,8,6,7],[48,34,7,5],[22,-14,4,6],[-16,-8,5,5],[36,44,6,6]];
 MONO.forEach(([x,z,w,h])=>addWall(x,z,w,h,0.9,Math.max(1,Math.round(w/4))));
 
@@ -179,7 +188,7 @@ function orb(){const g=new THREE.Group();g.add(mesh(new THREE.SphereGeometry(0.3
 function starPick(){return mesh(new THREE.OctahedronGeometry(0.55,0),MAT.gold)}
 function donutPick(){return mesh(new THREE.TorusGeometry(0.5,0.24,6,12),MAT.pink)}
 function creature(){const g=new THREE.Group();g.add(mesh(new THREE.SphereGeometry(0.72,8,6),MAT.purple,0,0.8,0));g.add(mesh(new THREE.ConeGeometry(0.22,0.5,5),MAT.darkpurple,-0.4,1.5,0));g.add(mesh(new THREE.ConeGeometry(0.22,0.5,5),MAT.darkpurple,0.4,1.5,0));g.add(mesh(new THREE.SphereGeometry(0.14,6,4),MAT.white,-0.26,1,0.55));g.add(mesh(new THREE.SphereGeometry(0.14,6,4),MAT.white,0.26,1,0.55));return g}
-/* NPC faces painted on canvas, billboarded as sprites (LSD-style) */
+/* NPC faces painted on canvas, billboarded as sprites (dream-style) */
 function faceTex(kind){const s=document.createElement('canvas');s.width=s.height=256;const g=s.getContext('2d');g.clearRect(0,0,256,256);
  const eyes=(y)=>{g.strokeStyle='#332244';g.lineWidth=7;g.lineCap='round';[96,160].forEach(cx=>{g.beginPath();g.arc(cx,y,16,.15*Math.PI,.85*Math.PI);g.stroke()});g.beginPath();g.arc(128,y+26,10,0,Math.PI);g.stroke()};
  if(kind==='moon'){g.fillStyle='#fef08a';g.beginPath();g.arc(128,128,86,0,7);g.fill();g.fillStyle='#fde68a';g.beginPath();g.arc(100,100,14,0,7);g.fill();g.beginPath();g.arc(160,150,10,0,7);g.fill();eyes(120);g.fillStyle='#ffb7e6';g.beginPath();g.arc(88,152,12,0,7);g.fill();g.beginPath();g.arc(168,152,12,0,7);g.fill()}
@@ -220,8 +229,8 @@ const FORMS=['dreamer','cat','ghost','donut','star','robot','frog','cupcake'];
 const LINES=["I dreamed I was a sandwich. Best day ever.","No thoughts. Just vibes.","You smell like starlight and donuts.","I walked here in my sleep. Literally.","Shifting is just redecorating your brain!","Certified silly. Officially.","The moon owes me five bucks.","Wheee is a valid life philosophy.","Every dream is just your brain on holiday.","I counted sheep. They unionised."];
 let px=0,pz=8,yaw=0,pitch=0,eyeH=1.7,size=1,view='FIRST-PERSON',form='dreamer';
 let ctrl='Normal controls',ctrlMode='normal',ctrlT=0,palette=0,timeMode='Day';
-let score=0,donuts=0,orbs=0,meter=0,trip=0,dist=0,gateStep=0,ng=1,paused=false,frame=0;
-let snacks=0; /* snacks eaten during MUNCHIES */
+let score=0,donuts=0,orbs=0,meter=0,dream=0,dist=0,gateStep=0,ng=1,paused=false,frame=0;
+let snacks=0; /* snacks eaten during SNACK RAIN */
 let keys={},walkHeld=false,locked=false,dragging=false,lastPX=0,lastPY=0;
 const clock=new THREE.Clock();
 /* third-person dreamer model */
@@ -250,12 +259,12 @@ function applyZone(){const th=THEMES[themeIdx];
  const gt=texFor('g',themeIdx);if(gt){floorMat.map=gt;floorMat.map.repeat.set(10,10);floorMat.color.set(0xffffff)}else floorMat.color.set(th.groundCol);floorMat.needsUpdate=true;
  const wt=texFor('w',themeIdx)||th.wallTex;wallMats.forEach(m=>{if(wt){m.map=wt.clone();m.map.needsUpdate=true;m.color.set(0xffffff)}else m.color.set(th.wallCol);m.needsUpdate=true});
  const st=texFor('s',themeIdx);if(st){skyMat.map=st;skyMat.color.set(0xffffff)}else skyMat.color.set(th.skyCol);skyMat.needsUpdate=true;
- scene.fog.color.set(th.fog);scene.fog.density=th.fogD;applyTime();if(FX.cottonT>0)cottonLook()}
+ scene.fog.color.set(th.fog);scene.fog.density=th.fogD;applyTime();if(FX.desertT>0)desertLook()}
 function applyTime(){const base=THEMES[themeIdx].fogD;
  if(timeMode==='Day'){hemi.intensity=0.95;hemi.color.set(0xfff0fa);sun.intensity=1.1;sun.color.set(0xffffff);scene.fog.density=base}
  if(timeMode==='Night'){hemi.intensity=0.4;hemi.color.set(0x7788ff);sun.intensity=0.35;sun.color.set(0x8899ff);scene.fog.density=base+0.012}
  if(timeMode==='Dawn'){hemi.intensity=0.8;hemi.color.set(0xffb7e6);sun.intensity=0.7;sun.color.set(0xffd9ec);scene.fog.density=base}
- if(timeMode==='Sunset'){hemi.intensity=0.7;hemi.color.set(0xff9d5c);sun.intensity=0.8;sun.color.set(0xffb37a);scene.fog.density=base+0.004}if(FX.cottonT>0)cottonLook()}
+ if(timeMode==='Sunset'){hemi.intensity=0.7;hemi.color.set(0xff9d5c);sun.intensity=0.8;sun.color.set(0xffb37a);scene.fog.density=base+0.004}if(FX.desertT>0)desertLook()}
 
 /* ================= HUD / BANNER / SAY ================= */
 function banner(t){const b=el('banner');b.textContent=t;b.classList.add('show');setTimeout(()=>b.classList.remove('show'),2000)}
@@ -266,14 +275,17 @@ const partGeo=new THREE.TetrahedronGeometry(0.09);
 function burst(x,y,z,col,n=14){for(let i=0;i<n;i++){const m=new THREE.Mesh(partGeo,new THREE.MeshBasicMaterial({color:pick([0xffd93d,0xff6ec7,0x6effd8,0xffffff])}));m.position.set(x+R(-0.3,0.3),y+R(0,0.5),z+R(-0.3,0.3));scene.add(m);parts.push({m,vx:R(-1.5,1.5),vy:R(1,3),vz:R(-1.5,1.5),life:0.9})}}
 function stepParts(dt){parts.forEach(p=>{p.m.position.x+=p.vx*dt;p.m.position.y+=p.vy*dt;p.m.position.z+=p.vz*dt;p.vy-=4*dt;p.life-=dt;p.m.rotation.x+=dt*5;p.m.rotation.y+=dt*7});for(let i=parts.length-1;i>=0;i--)if(parts[i].life<=0){scene.remove(parts[i].m);parts[i].m.material.dispose();parts.splice(i,1)}}
 
-/* ================= v3.1 — CANNABIS-DREAM EFFECTS ================= */
-const VERSION='3.1';
+/* ================= v3.2 — DREAM EFFECTS ================= */
+const VERSION='3.2';
 const SILLY=["hehehe!","HA! That tickles!","teehee!","snrk!","bwahaha!","hee hee hee!","giggle giggle!","ohhh that tickles my stars!"];
 const SILLY_LINES=["hehehe! You walked right into me!","HA! Best bump ever!","teehee! I am the funniest moon!","snrk! I can't stop giggling!","bwahaha! The dream is ticklish today!","hee hee! Everything is funny and I don't know why!","hehehe! Did you see that? I did that!"];
-const DEEP=["what if the dream is dreaming YOU, man...","do donuts dream of us?","time is just a really slow SHIFT...","the moon is just the night's night-light...","what if walking is just falling, but sideways?","maybe the SHIFT is just the dream changing its mind...","are we the dream, or is the dream us?","if a donut falls in the dream and no one eats it, is it still a donut?","the stars are just the sky's freckles, you know?"];
-const FX={timeScale:1,tempoSaved:430,munchT:0,munchTimer:0,timeDilT:0,giggleT:0,giggleTimer:0,cottonT:0,juiceBox:null,deepT:0,deepTimer:0,snack:null,couchT:0,watchT:0,eyes:[],blinkIn:2,blink:0,treeGigT:4};
-const munchFood=[];
-function cottonLook(){scene.fog.color.set(0xe8c47a);scene.fog.density=THEMES[themeIdx].fogD+0.008;hemi.color.set(0xffe0b3);hemi.intensity=0.85;sun.color.set(0xffd9a0);sun.intensity=0.9;floorMat.color.set(0xffd9a0);floorMat.needsUpdate=true}
+const DEEP=["what if the dream is dreaming YOU?","do donuts dream of us?","time is just a really slow SHIFT...","the moon is just the night's night-light...","what if walking is just falling, but sideways?","maybe the SHIFT is just the dream changing its mind...","are we the dream, or is the dream us?","if a donut falls in the dream and no one eats it, is it still a donut?","the stars are just the sky's freckles."];
+const FX={timeScale:1,tempoSaved:430,snackRainT:0,snackRainTimer:0,slowT:0,giggleT:0,giggleTimer:0,desertT:0,juiceBox:null,deepT:0,deepTimer:0,donut:null,driftT:0,awakeT:0,eyes:[],blinkIn:2,blink:0,treeGigT:4};
+/* v3.2 — electronic-music-video visuals */
+Object.assign(FX,{kaleidoT:0,kaleidoK:0,pulseT:0,pulsePhase:0,pulseBase:null,rainbowT:0,rainbowHue:0,rainbowBase:null,vortexT:0,vortexParts:[],mirrorT:0,laserT:0,laserGroup:null,fractalT:0,fractalGroup:null,breathT:0,tunnelT:0,tunnelGroup:null});
+function easeWindow(elapsed,dur){const x=Math.min(elapsed,dur-elapsed,1);return x<=0?0:x>=1?1:x*x*(3-2*x)}
+const rainFood=[];
+function desertLook(){scene.fog.color.set(0xe8c47a);scene.fog.density=THEMES[themeIdx].fogD+0.008;hemi.color.set(0xffe0b3);hemi.intensity=0.85;sun.color.set(0xffd9a0);sun.intensity=0.9;floorMat.color.set(0xffd9a0);floorMat.needsUpdate=true}
 function juiceBoxMesh(){const g=new THREE.Group();const s=document.createElement('canvas');s.width=s.height=256;const c=s.getContext('2d');
  c.fillStyle='#f97316';c.fillRect(0,0,256,256);c.fillStyle='#fff7ed';c.fillRect(16,64,224,128);
  c.fillStyle='#ea580c';c.font='bold 46px system-ui';c.textAlign='center';c.fillText('JUICE',128,124);
@@ -287,21 +299,21 @@ function spawnFood(){const kind=pick(['donut','cup','bar']);let m;
  else if(kind==='cup'){m=new THREE.Group();m.add(mesh(new THREE.CylinderGeometry(0.22,0.32,0.4,8),MAT.orange,0,0,0));m.add(mesh(new THREE.SphereGeometry(0.3,8,6),MAT.pink,0,0.32,0))}
  else m=new THREE.Mesh(new THREE.BoxGeometry(0.7,0.25,0.35),MAT.brown);
  m.position.set(clampX(px+R(-14,14)),11+R(0,3),clampZ(pz+R(-14,14)));scene.add(m);
- munchFood.push({m,vy:-R(2.6,3.6),spin:R(1,3)})}
-function startCotton(){if(FX.cottonT>0){FX.cottonT=45;return}FX.cottonT=45;
+ rainFood.push({m,vy:-R(2.6,3.6),spin:R(1,3)})}
+function startDesert(){if(FX.desertT>0){FX.desertT=45;return}FX.desertT=45;
  const x=clampX(px-Math.sin(yaw)*10),z=clampZ(pz-Math.cos(yaw)*10);
  const g=juiceBoxMesh();const h=new THREE.Sprite(new THREE.SpriteMaterial({map:HALO,transparent:true,depthWrite:false}));h.scale.set(5,5,1);g.add(h);
- g.position.set(x,0.75,z);scene.add(g);FX.juiceBox={group:g,x,z};cottonLook();
- say('🏜️ COTTONMOUTH! The dream turned into a dry candy desert... find the GIANT JUICE BOX! 🧃')}
-function spawnSnackPortal(){if(FX.snack){FX.snack.t=30;return}
+ g.position.set(x,0.75,z);scene.add(g);FX.juiceBox={group:g,x,z};desertLook();
+ say('🏜️ CANDY DESERT! The dream turned into a dry candy desert... find the GIANT JUICE BOX! 🧃')}
+function spawnDonutPortal(){if(FX.donut){FX.donut.t=30;return}
  const x=clampX(px-Math.sin(yaw)*9),z=clampZ(pz-Math.cos(yaw)*9);
  const g=new THREE.Group();
  g.add(new THREE.Mesh(new THREE.TorusGeometry(3,0.8,10,28),new THREE.MeshBasicMaterial({color:0xff6ec7})));
  g.add(new THREE.Mesh(new THREE.TorusGeometry(2.2,0.3,8,24),new THREE.MeshBasicMaterial({color:0xffd93d})));
  const h=new THREE.Sprite(new THREE.SpriteMaterial({map:HALO,transparent:true,depthWrite:false}));h.scale.set(10,10,1);g.add(h);
- g.position.set(x,2.6,z);scene.add(g);FX.snack={group:g,x,z,t:30};
+ g.position.set(x,2.6,z);scene.add(g);FX.donut={group:g,x,z,t:30};
  say('🍩 A GIANT DONUT PORTAL! Walk through it for a free MEGA SHIFT!')}
-function startWatch(){if(FX.watchT>0){FX.watchT=20;return}FX.watchT=20;FX.blinkIn=1.5;FX.blink=0;FX.treeGigT=3;
+function startAwake(){if(FX.awakeT>0){FX.awakeT=20;return}FX.awakeT=20;FX.blinkIn=1.5;FX.blink=0;FX.treeGigT=3;
  const eyeW=new THREE.MeshBasicMaterial({color:0xffffff}),pup=new THREE.MeshBasicMaterial({color:0x1f2937});
  for(const t of ents.filter(e=>e.kind==='tree')){const eg=new THREE.Group();eg.position.set(0,3.1,0);
   const l=new THREE.Mesh(new THREE.SphereGeometry(0.17,8,6),eyeW);l.position.set(-0.34,0,0.62);
@@ -309,48 +321,124 @@ function startWatch(){if(FX.watchT>0){FX.watchT=20;return}FX.watchT=20;FX.blinkI
   const lp=new THREE.Mesh(new THREE.SphereGeometry(0.08,6,4),pup);lp.position.set(-0.34,0,0.76);
   const rp=lp.clone();rp.position.x=0.34;
   eg.add(l,r,lp,rp);t.group.add(eg);FX.eyes.push({group:eg,x:t.x,z:t.z,tree:t})}
- say('👀 The trees are watching you... (cute watching, promise!)')}
+ say('👀 THE TREES ARE AWAKE! They opened their eyes just for you!')}
+/* v3.2 — VORTEX spiral parts + LASER beams */
+const vortexGeo=new THREE.TetrahedronGeometry(0.16);
+function spawnVortex(){if(FX.vortexParts.length)return;for(let i=0;i<26;i++){const m=new THREE.Mesh(vortexGeo,new THREE.MeshBasicMaterial({color:pick([0xffd93d,0xff6ec7,0x6effd8,0xffffff,0xc86eff]),transparent:true,opacity:0}));scene.add(m);FX.vortexParts.push({m,a:R(0,Math.PI*2),r:R(2,7),h:R(0.5,7),sp:R(0.35,0.7),rise:R(0.3,0.7)})}}
+function spawnLasers(){if(FX.laserGroup)return;const g=new THREE.Group();const cols=[0xff6ec7,0x6effd8,0xffd93d,0x8ab6ff,0xc86eff];
+ for(let i=0;i<5;i++){const mat=new THREE.MeshBasicMaterial({color:cols[i],transparent:true,opacity:0,fog:false,depthWrite:false});
+  const beam=new THREE.Mesh(new THREE.BoxGeometry(0.8,44,0.8),mat);beam.position.set(Math.cos(i*1.256)*13,14,Math.sin(i*1.256)*13);beam.rotation.z=0.5;beam.rotation.y=-i*1.256;g.add(beam)}
+ g.position.set(px,0,pz);scene.add(g);FX.laserGroup=g}
+/* v3.2 — FRACTAL BLOOM mandala + TUNNEL OF LIGHT */
+function spawnFractal(){if(FX.fractalGroup)return;const g=new THREE.Group();
+ const cols=[0xff6ec7,0xffd93d,0x6effd8,0x8ab6ff,0xc86eff,0xff9d5c];
+ for(let i=0;i<5;i++){const mat=new THREE.MeshBasicMaterial({color:cols[i%6],transparent:true,opacity:0,fog:false});
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(2.2+i*1.5,0.09,6,48),mat);ring.position.y=6+i*0.7;ring.rotation.x=Math.PI/2.4;ring.userData.baseOp=0.75;g.add(ring)}
+ for(let i=0;i<12;i++){const mat=new THREE.MeshBasicMaterial({color:cols[i%6],transparent:true,opacity:0,fog:false});
+  const petal=new THREE.Mesh(new THREE.OctahedronGeometry(0.5,0),mat);const a=i/12*Math.PI*2;petal.position.set(Math.cos(a)*6,7.5,Math.sin(a)*6);petal.userData.baseOp=0.8;g.add(petal)}
+ for(let i=0;i<3;i++){const mat=new THREE.MeshBasicMaterial({color:cols[(i+2)%6],transparent:true,opacity:0,fog:false});
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(3+i*2.2,0.12,6,48),mat);ring.rotation.x=-Math.PI/2;ring.position.y=0.08;ring.userData.baseOp=0.5;g.add(ring)}
+ g.position.set(px-Math.sin(yaw)*14,0,pz-Math.cos(yaw)*14);scene.add(g);FX.fractalGroup=g}
+function spawnTunnel(){if(FX.tunnelGroup)return;const g=new THREE.Group();
+ const cols=[0xff6ec7,0x6effd8,0xffd93d,0x8ab6ff,0xc86eff,0xffffff];
+ for(let i=0;i<10;i++){const mat=new THREE.MeshBasicMaterial({color:cols[i%6],transparent:true,opacity:0,blending:THREE.AdditiveBlending,fog:false,depthWrite:false});
+  const ring=new THREE.Mesh(new THREE.TorusGeometry(3,0.12,6,32),mat);ring.position.set(0,1.7,-(6+i*4));ring.userData.ring=true;g.add(ring)}
+ for(let i=0;i<30;i++){const m=new THREE.Mesh(new THREE.TetrahedronGeometry(0.12),new THREE.MeshBasicMaterial({color:pick(cols),transparent:true,opacity:0,blending:THREE.AdditiveBlending,fog:false,depthWrite:false}));
+  const a=R(0,Math.PI*2),r=R(0.5,3.2);m.position.set(Math.cos(a)*r,R(0.3,3.4),-R(4,42));m.userData.ring=false;g.add(m)}
+ g.position.set(px,0,pz);g.rotation.y=yaw;scene.add(g);FX.tunnelGroup=g}
 function startFX(name){
- if(name==='MUNCHIES'){if(FX.munchT>0){FX.munchT=20;return}FX.munchT=20;FX.munchTimer=0;snacks=0;say('🍩 MUNCHIES! Snacks are falling from the sky!')}
- if(name==='TIME DILATION'){if(FX.timeDilT<=0)FX.tempoSaved=tempo;FX.timeDilT=15;FX.timeScale=0.4;tempo=Math.round(tempo*2.2);musicLoop()}
- if(name==='THE GIGGLES'){FX.giggleT=15;FX.giggleTimer=0}
- if(name==='COTTONMOUTH')startCotton();
- if(name==='DEEP THOUGHTS'){FX.deepT=20;FX.deepTimer=0}
- if(name==='SNACK ATTACK')spawnSnackPortal();
- if(name==='COUCH LOCK'){FX.couchT=15;say('🛋️ COUCH LOCK! So cozy... the snacks come to YOU now.')}
- if(name==='THE TREES ARE WATCHING')startWatch()}
+ if(name==='SNACK RAIN'){if(FX.snackRainT>0){FX.snackRainT=20;return}FX.snackRainT=20;FX.snackRainTimer=0;snacks=0;say('🍩 SNACK RAIN! Snacks are falling from the sky!')}
+ if(name==='SLOW DREAM'){if(FX.slowT<=0)FX.tempoSaved=tempo;FX.slowT=15;FX.timeScale=0.4;tempo=Math.round(tempo*2.2);musicLoop()}
+ if(name==='GIGGLE DREAM'){FX.giggleT=15;FX.giggleTimer=0}
+ if(name==='CANDY DESERT')startDesert();
+ if(name==='DREAM THOUGHTS'){FX.deepT=20;FX.deepTimer=0}
+ if(name==='DONUT PORTAL')spawnDonutPortal();
+ if(name==='DREAM DRIFT'){FX.driftT=15;say('🛋️ DREAM DRIFT! So cozy... the snacks come to YOU now.')}
+ if(name==='THE TREES ARE AWAKE')startAwake()
+ /* v3.2 — electronic-music-video visuals */
+ if(name==='KALEIDOSCOPE'){FX.kaleidoT=18;say('🔷 KALEIDOSCOPE! The dream folds into a mirror flower!')}
+ if(name==='NEON PULSE'){if(FX.pulseT<=0){FX.pulseBase={hemi:hemi.intensity,sun:sun.intensity,fog:scene.fog.density}}FX.pulseT=16;FX.pulsePhase=0;say('💡 NEON PULSE! The whole dream breathes with the beat!')}
+ if(name==='RAINBOW DRIFT'){if(FX.rainbowT<=0){FX.rainbowBase={fog:scene.fog.color.clone(),hemi:hemi.color.clone(),sun:sun.color.clone(),sky:skyMat.color.clone()};FX.rainbowHue=Math.random()}FX.rainbowT=18;say('🌈 RAINBOW DRIFT! The dream slowly changes color!')}
+ if(name==='VORTEX'){FX.vortexT=18;spawnVortex();say('🌀 VORTEX! A spiral of sparkles swirls overhead!')}
+ if(name==='MIRROR DREAM'){FX.mirrorT=18;cv.style.transform='scaleX(-1)';say('🪞 MIRROR DREAM! The world flips sideways!')}
+ if(name==='LASER DREAM'){FX.laserT=18;spawnLasers();say('✨ LASER DREAM! Slow light beams sweep the sky!')}
+ if(name==='FRACTAL BLOOM'){FX.fractalT=18;spawnFractal();say('🌸 FRACTAL BLOOM! Jewel mandalas bloom across the sky!')}
+ if(name==='BREATHING WORLD'){FX.breathT=18;say('🌿 BREATHING WORLD! The dream swells and breathes around you!')}
+ if(name==='TUNNEL OF LIGHT'){FX.tunnelT=18;spawnTunnel();say('💫 TUNNEL OF LIGHT! The dream pulls you through glowing rings!')}}
+
 function tickFX(dt,dtR){
- if(FX.timeDilT>0){FX.timeDilT-=dtR;if(FX.timeDilT<=0){FX.timeDilT=0;FX.timeScale=1;tempo=FX.tempoSaved||430;musicLoop();say('⏰ Time flows normally again... probably.')}}
- if(FX.munchT>0){FX.munchT-=dtR;FX.munchTimer-=dtR;if(FX.munchTimer<=0){FX.munchTimer=0.35;spawnFood()}
-  for(let i=munchFood.length-1;i>=0;i--){const f=munchFood[i];f.m.position.y+=f.vy*dt;f.m.rotation.x+=dt*f.spin;f.m.rotation.y+=dt*f.spin;
+ if(FX.slowT>0){FX.slowT-=dtR;if(FX.slowT<=0){FX.slowT=0;FX.timeScale=1;tempo=FX.tempoSaved||430;musicLoop();say('⏰ Time flows normally again... probably.')}}
+ if(FX.snackRainT>0){FX.snackRainT-=dtR;FX.snackRainTimer-=dtR;if(FX.snackRainTimer<=0){FX.snackRainTimer=0.35;spawnFood()}
+  for(let i=rainFood.length-1;i>=0;i--){const f=rainFood[i];f.m.position.y+=f.vy*dt;f.m.rotation.x+=dt*f.spin;f.m.rotation.y+=dt*f.spin;
    const d=Math.hypot(f.m.position.x-px,f.m.position.z-pz);
-   if(d<1.6&&Math.abs(f.m.position.y-1.2)<1.4){snacks++;score+=5;popSnd();burst(f.m.position.x,1.2,f.m.position.z,0,10);scene.remove(f.m);munchFood.splice(i,1);continue}
-   if(f.m.position.y<0.3){scene.remove(f.m);munchFood.splice(i,1)}}
-  if(FX.munchT<=0){FX.munchT=0;for(const f of munchFood)scene.remove(f.m);munchFood.length=0}}
+   if(d<1.6&&Math.abs(f.m.position.y-1.2)<1.4){snacks++;score+=5;popSnd();burst(f.m.position.x,1.2,f.m.position.z,0,10);scene.remove(f.m);rainFood.splice(i,1);continue}
+   if(f.m.position.y<0.3){scene.remove(f.m);rainFood.splice(i,1)}}
+  if(FX.snackRainT<=0){FX.snackRainT=0;for(const f of rainFood)scene.remove(f.m);rainFood.length=0}}
  if(FX.giggleT>0){FX.giggleT-=dtR;FX.giggleTimer-=dtR;if(FX.giggleTimer<=0){FX.giggleTimer=1.3;const cs=ents.filter(e=>e.kind==='npc'||e.kind==='creature');if(cs.length){const c=pick(cs);say((c.npc?c.npc.n:'Little creature')+': "'+pick(SILLY)+'"');giggleSnd()}}}
- if(FX.cottonT>0){FX.cottonT-=dtR;
+ if(FX.desertT>0){FX.desertT-=dtR;
   if(FX.juiceBox){const jb=FX.juiceBox;jb.group.rotation.y+=dt*0.6;const d=Math.hypot(jb.x-px,jb.z-pz);
-   if(d<2){scene.remove(jb.group);FX.juiceBox=null;FX.cottonT=0;applyZone();banner('🧃 Ahhh, refreshed!');burst(px,1.5,pz,0,24);popSnd();say('Juice Box: "You found me! The desert is over!"');return}}
-  if(FX.cottonT<=0){FX.cottonT=0;if(FX.juiceBox){scene.remove(FX.juiceBox.group);FX.juiceBox=null}applyZone();say('🏜️ The desert fades on its own... you are refreshed-ish.')}}
+   if(d<2){scene.remove(jb.group);FX.juiceBox=null;FX.desertT=0;applyZone();banner('🧃 Ahhh, refreshed!');burst(px,1.5,pz,0,24);popSnd();say('Juice Box: "You found me! The desert is over!"');return}}
+  if(FX.desertT<=0){FX.desertT=0;if(FX.juiceBox){scene.remove(FX.juiceBox.group);FX.juiceBox=null}applyZone();say('🏜️ The desert fades on its own... you are refreshed-ish.')}}
  if(FX.deepT>0){FX.deepT-=dtR;FX.deepTimer-=dtR;if(FX.deepTimer<=0){FX.deepTimer=4;const ns=ents.filter(e=>e.kind==='npc');if(ns.length){const n=pick(ns);say(n.npc.n+': "'+pick(DEEP)+'"')}else say('Milo thinks: "'+pick(DEEP)+'"')}}
- if(FX.snack){const s=FX.snack;s.t-=dtR;s.group.rotation.z+=dt*0.5;s.group.position.y=2.6+Math.sin(frame*0.03)*0.3;
+ if(FX.donut){const s=FX.donut;s.t-=dtR;s.group.rotation.z+=dt*0.5;s.group.position.y=2.6+Math.sin(frame*0.03)*0.3;
   const d=Math.hypot(s.x-px,s.z-pz);
-  if(d<3.5){scene.remove(s.group);FX.snack=null;doShift(true)}
-  else if(s.t<=0){scene.remove(s.group);FX.snack=null;say('🍩 The giant donut drifts away... maybe next dream.')}}
- if(FX.couchT>0){FX.couchT-=dtR;if(FX.couchT<=0){FX.couchT=0;say('🛋️ You can move normally again. The couch releases you.')}}
- if(FX.watchT>0){FX.watchT-=dtR;FX.blinkIn-=dtR;
+  if(d<3.5){scene.remove(s.group);FX.donut=null;doShift(true)}
+  else if(s.t<=0){scene.remove(s.group);FX.donut=null;say('🍩 The giant donut drifts away... maybe next dream.')}}
+ if(FX.driftT>0){FX.driftT-=dtR;if(FX.driftT<=0){FX.driftT=0;say('🛋️ You can move normally again. The drift lets go of you.')}}
+ if(FX.awakeT>0){FX.awakeT-=dtR;FX.blinkIn-=dtR;
   if(FX.blinkIn<=0){FX.blinkIn=2.8;FX.blink=0.18}
   if(FX.blink>0)FX.blink-=dtR;
   const sy=FX.blink>0?0.12:1;
   for(const ey of FX.eyes){ey.group.rotation.y=Math.atan2(px-ey.x,pz-ey.z);ey.group.scale.y=sy}
   FX.treeGigT-=dtR;if(FX.treeGigT<=0){FX.treeGigT=5;if(FX.eyes.length){say('🌲: "hehe!"');giggleSnd()}}
-  if(FX.watchT<=0){FX.watchT=0;for(const ey of FX.eyes)ey.tree.group.remove(ey.group);FX.eyes.length=0}}}
+  if(FX.awakeT<=0){FX.awakeT=0;for(const ey of FX.eyes)ey.tree.group.remove(ey.group);FX.eyes.length=0}}
+ /* ---- v3.2 visuals ---- */
+ if(FX.kaleidoT>0){FX.kaleidoT-=dtR;const tgt=FX.kaleidoT>1?1:Math.max(0,FX.kaleidoT);FX.kaleidoK+=Math.max(-1,Math.min(1,tgt-FX.kaleidoK))*Math.min(1,dtR*2.5)}
+ else if(FX.kaleidoK>0){FX.kaleidoK=Math.max(0,FX.kaleidoK-dtR*2.5)}
+ if(FX.pulseT>0){FX.pulseT-=dtR;const e=easeWindow(16-FX.pulseT,16);FX.pulsePhase+=dtR*(1000/Math.max(tempo,120))*Math.PI*2;const s=Math.sin(FX.pulsePhase);
+  const b=FX.pulseBase||{hemi:0.95,sun:1.1,fog:0.016};
+  hemi.intensity=b.hemi*(1+0.12*e*s);sun.intensity=b.sun*(1+0.15*e*s);scene.fog.density=b.fog*(1+0.08*e*s);
+  for(const en of ents){if((en.kind==='orb'||en.kind==='starPick'||en.kind==='donutPick')&&en.group)en.group.scale.setScalar(1+0.15*e*s)}
+  if(FX.pulseT<=0){FX.pulseT=0;if(FX.pulseBase){hemi.intensity=FX.pulseBase.hemi;sun.intensity=FX.pulseBase.sun;scene.fog.density=FX.pulseBase.fog;FX.pulseBase=null}
+   for(const en of ents){if((en.kind==='orb'||en.kind==='starPick'||en.kind==='donutPick')&&en.group)en.group.scale.setScalar(1)}}}
+ if(FX.rainbowT>0){FX.rainbowT-=dtR;const e=easeWindow(18-FX.rainbowT,18);FX.rainbowHue=(FX.rainbowHue+dtR/30)%1;
+  const b=FX.rainbowBase;
+  const rc=new THREE.Color().setHSL(FX.rainbowHue,0.65,0.55);
+  const hc=new THREE.Color().setHSL(FX.rainbowHue,0.55,0.72);
+  const sc=new THREE.Color().setHSL((FX.rainbowHue+0.08)%1,0.6,0.75);
+  const sk=new THREE.Color().setHSL(FX.rainbowHue,0.7,0.68);
+  scene.fog.color.copy(b.fog).lerp(rc,e);hemi.color.copy(b.hemi).lerp(hc,e);sun.color.copy(b.sun).lerp(sc,e);skyMat.color.copy(b.sky).lerp(sk,e);skyMat.needsUpdate=true;
+  if(FX.rainbowT<=0){FX.rainbowT=0;applyZone()}}
+ if(FX.vortexT>0){FX.vortexT-=dtR;const e=easeWindow(18-FX.vortexT,18);
+  for(const p of FX.vortexParts){p.a+=p.sp*dtR;p.h+=p.rise*dtR;if(p.h>8)p.h=0.5;
+   p.m.position.set(px+Math.cos(p.a)*p.r,p.h,pz+Math.sin(p.a)*p.r);
+   p.m.rotation.x+=dtR*2;p.m.rotation.y+=dtR*3;p.m.material.opacity=0.9*e;p.m.scale.setScalar(0.6+0.4*e)}
+  if(FX.vortexT<=0){FX.vortexT=0;for(const p of FX.vortexParts)scene.remove(p.m);FX.vortexParts.length=0}}
+ if(FX.mirrorT>0){FX.mirrorT-=dtR;if(FX.mirrorT<=0){FX.mirrorT=0;cv.style.transform=''}}
+ if(FX.laserT>0){FX.laserT-=dtR;const e=easeWindow(18-FX.laserT,18);const g=FX.laserGroup;
+  if(g){g.position.set(px,0,pz);g.rotation.y+=dtR*0.12;
+   g.children.forEach((beam,i)=>{beam.material.opacity=0.55*e;beam.material.color.setHSL((i*0.2+frame*0.0004)%1,0.9,0.65)})}
+  if(FX.laserT<=0){FX.laserT=0;if(FX.laserGroup){scene.remove(FX.laserGroup);FX.laserGroup.children.forEach(b=>b.material.dispose());FX.laserGroup=null}}}
+ if(FX.fractalT>0){FX.fractalT-=dtR;const e=easeWindow(18-FX.fractalT,18);const g=FX.fractalGroup;
+  if(g){g.position.set(px-Math.sin(yaw)*14,0,pz-Math.cos(yaw)*14);g.rotation.y+=dtR*0.15;g.scale.setScalar(1+0.06*Math.sin(frame*0.01));
+   g.children.forEach(ch=>{ch.material.opacity=(ch.userData.baseOp||0.7)*e})}
+  if(FX.fractalT<=0){FX.fractalT=0;if(FX.fractalGroup){scene.remove(FX.fractalGroup);FX.fractalGroup.children.forEach(c=>c.material.dispose());FX.fractalGroup=null}}}
+ if(FX.breathT>0){FX.breathT-=dtR;const e=easeWindow(18-FX.breathT,18);const t=18-FX.breathT;
+  for(const en of ents){if((en.kind==='tree'||en.kind==='mush')&&en.group){const s=1+0.09*e*Math.sin(t*0.9+en.b);en.group.scale.setScalar(s)}}
+  if(floorMat.map){floorMat.map.offset.x+=dtR*0.012;floorMat.map.offset.y+=dtR*0.02}
+  if(FX.breathT<=0){FX.breathT=0;for(const en of ents){if((en.kind==='tree'||en.kind==='mush')&&en.group)en.group.scale.setScalar(1)}}}
+ if(FX.tunnelT>0){FX.tunnelT-=dtR;const e=easeWindow(18-FX.tunnelT,18);camera.fov=72+23*e;camera.updateProjectionMatrix();
+  const g=FX.tunnelGroup;
+  if(g){g.position.set(px,0,pz);g.rotation.y=yaw;
+   for(const ch of g.children){if(ch.userData.ring){ch.position.z+=dtR*6;if(ch.position.z>-2)ch.position.z-=40;ch.material.opacity=0.55*e}
+    else{ch.position.z+=dtR*8;if(ch.position.z>-1){ch.position.z=-42;const a=R(0,Math.PI*2),r=R(0.5,3.2);ch.position.x=Math.cos(a)*r;ch.position.y=R(0.3,3.4)}ch.material.opacity=0.85*e}}}
+  if(FX.tunnelT<=0){FX.tunnelT=0;camera.fov=72;camera.updateProjectionMatrix();if(FX.tunnelGroup){scene.remove(FX.tunnelGroup);FX.tunnelGroup.children.forEach(c=>c.material.dispose());FX.tunnelGroup=null}}}}
 
 /* ================= THE SHIFT (v1 design, translated to 3D) ================= */
 function doShift(mega=false){
  if(!started||paused)return;audioInit();
  const effects=[];const count=mega?3:pick([1,1,2]);
- const pool=['BACKGROUND','FORM','VIEW','CONTROLS','SPAWNER','MUSIC','SIZE','TIME','PALETTE','MUNCHIES','TIME DILATION','THE GIGGLES','COTTONMOUTH','DEEP THOUGHTS','SNACK ATTACK','COUCH LOCK','THE TREES ARE WATCHING'];
+ const pool=['BACKGROUND','FORM','VIEW','CONTROLS','SPAWNER','MUSIC','SIZE','TIME','PALETTE','SNACK RAIN','SLOW DREAM','GIGGLE DREAM','CANDY DESERT','DREAM THOUGHTS','DONUT PORTAL','DREAM DRIFT','THE TREES ARE AWAKE','KALEIDOSCOPE','NEON PULSE','RAINBOW DRIFT','VORTEX','MIRROR DREAM','LASER DREAM','FRACTAL BLOOM','BREATHING WORLD','TUNNEL OF LIGHT'];
  for(let i=0;i<count;i++){const e=pick(pool);effects.push(e);
   if(e==='BACKGROUND'){let o=themeIdx;do{themeIdx=Math.floor(Math.random()*THEMES.length)}while(themeIdx===o);applyZone()}
   if(e==='FORM')setForm(pick(FORMS));
@@ -361,12 +449,12 @@ function doShift(mega=false){
   if(e==='SIZE'){size=pick([.55,.8,1,1.6,2.1]);eyeH=1.7*size}
   if(e==='TIME'){timeMode=pick(['Day','Night','Dawn','Sunset']);applyTime()}
   if(e==='PALETTE'){palette=(palette+1)%4;cv.style.filter=['none','hue-rotate(90deg) saturate(1.4)','invert(.85) hue-rotate(180deg)','sepia(.5) hue-rotate(-30deg) saturate(1.7)'][palette]}
-  if(['MUNCHIES','TIME DILATION','THE GIGGLES','COTTONMOUTH','DEEP THOUGHTS','SNACK ATTACK','COUCH LOCK','THE TREES ARE WATCHING'].includes(e))startFX(e);
+  if(['SNACK RAIN','SLOW DREAM','GIGGLE DREAM','CANDY DESERT','DREAM THOUGHTS','DONUT PORTAL','DREAM DRIFT','THE TREES ARE AWAKE','KALEIDOSCOPE','NEON PULSE','RAINBOW DRIFT','VORTEX','MIRROR DREAM','LASER DREAM','FRACTAL BLOOM','BREATHING WORLD','TUNNEL OF LIGHT'].includes(e))startFX(e);
  }
- trip=Math.min(100,trip+(mega?18:8));
+ dream=Math.min(100,dream+(mega?18:8));
  banner((mega?'🌈 MEGA SHIFT! ':'✨ SHIFT! ')+effects.join(' + ')+(effects.includes('FORM')?' — YOU ARE A '+form.toUpperCase()+' NOW!':'')+(effects.includes('VIEW')?' → '+view+'!':'!'));
  if(mega)meter=0;burst(px,1.5,pz,0xffd93d,30);note(523,.4);setTimeout(()=>note(784,.5),110);
- if(trip>=100){trip=0;ng++;banner('🎉 TRIP COMPLETE! NEW GAME+ '+ng+' — shifts get BIGGER 🎉');burst(px,1.5,pz,0xff6ec7,60);for(let i=0;i<20;i++)spawnKind(pick(['orb','starPick','donutPick','creature']),true)}
+ if(dream>=100){dream=0;ng++;banner('🎉 DREAM COMPLETE! NEW GAME+ '+ng+' — shifts get BIGGER 🎉');burst(px,1.5,pz,0xff6ec7,60);for(let i=0;i<20;i++)spawnKind(pick(['orb','starPick','donutPick','creature']),true)}
 }
 function bonk(){if(!started)return;giggleSnd();
  const n=ents.find(e=>Math.hypot(e.x-px,e.z-pz)<2.6);
@@ -402,17 +490,17 @@ function loop(){requestAnimationFrame(loop);const dtR=Math.min(clock.getDelta(),
   let mx=(keys['d']||keys['arrowright']?1:0)-(keys['a']||keys['arrowleft']?1:0);
   let my=(keys['w']||keys['arrowup']||walkHeld?1:0)-(keys['s']||keys['arrowdown']?1:0);
   if(ctrlMode==='invert'){mx*=-1;my*=-1}if(ctrlMode==='swap')mx*=-1;
-  const sp=(ctrlMode==='speedy'?12:ctrlMode==='moon'?4:7)*size*(FX.couchT>0?0.35:1);
+  const sp=(ctrlMode==='speedy'?12:ctrlMode==='moon'?4:7)*size*(FX.driftT>0?0.35:1);
   tickFX(dt,dtR);
   if(ctrlT>0){ctrlT-=dt;if(ctrlT<=0){ctrlMode='normal';ctrl='Normal controls'}}
   const fx=-Math.sin(yaw),fz=-Math.cos(yaw),rx=Math.cos(yaw),rz=-Math.sin(yaw);
   let vx=(fx*my+rx*mx),vz=(fz*my+rz*mx);const vl=Math.hypot(vx,vz);if(vl>0){vx/=vl;vz/=vl}
   const ox=px,oz=pz;[px,pz]=collide(px+vx*sp*dt,pz+vz*sp*dt);
-  const moved=Math.hypot(px-ox,pz-oz);dist+=moved;trip=Math.min(100,trip+moved*0.02);
+  const moved=Math.hypot(px-ox,pz-oz);dist+=moved;dream=Math.min(100,dream+moved*0.02);
   if(Math.floor(dist/40)>gateStep){gateStep=Math.floor(dist/40);spawnKind('portal',true);say('✨ A Shift Gate appeared somewhere nearby…')}
   /* entity updates + pickups */
   for(let i=ents.length-1;i>=0;i--){const e=ents[i];const d=Math.hypot(e.x-px,e.z-pz);
-   if(FX.couchT>0&&(e.kind==='orb'||e.kind==='starPick'||e.kind==='donutPick')&&d<12&&d>0.5){const mv=2.4*dt;e.x+=(px-e.x)/d*mv;e.z+=(pz-e.z)/d*mv;e.group.position.x=e.x;e.group.position.z=e.z}
+   if(FX.driftT>0&&(e.kind==='orb'||e.kind==='starPick'||e.kind==='donutPick')&&d<12&&d>0.5){const mv=2.4*dt;e.x+=(px-e.x)/d*mv;e.z+=(pz-e.z)/d*mv;e.group.position.x=e.x;e.group.position.z=e.z}
    if(e.bob&&e.group)e.group.position.y=1.1+Math.sin(frame*0.04+e.b)*0.25;
    if(e.kind==='orb'&&e.group)e.group.rotation.y+=dt*2;
    if(e.kind==='starPick'||e.kind==='donutPick')e.group.rotation.y+=dt*1.5;
@@ -421,16 +509,16 @@ function loop(){requestAnimationFrame(loop);const dtR=Math.min(clock.getDelta(),
     if(d<1.5){scene.remove(e.group);ents.splice(i,1);doShift(false);continue}}
    if(d<1.5){
     if(e.kind==='orb'){orbs++;meter=Math.min(100,meter+20);popSnd();burst(e.x,1.2,e.z,0,14);scene.remove(e.group);ents.splice(i,1);spawnKind('orb');if(meter>=100)say('🔮 Meter FULL! Press SHIFT for a MEGA SHIFT!');continue}
-    if(e.kind==='starPick'){score+=10;if(FX.munchT>0)snacks++;popSnd();burst(e.x,1.2,e.z,0,12);scene.remove(e.group);ents.splice(i,1);spawnKind('starPick');continue}
-    if(e.kind==='donutPick'){score+=25;donuts++;if(FX.munchT>0)snacks++;popSnd();burst(e.x,1.2,e.z,0,12);scene.remove(e.group);ents.splice(i,1);spawnKind('donutPick');continue}
+    if(e.kind==='starPick'){score+=10;if(FX.snackRainT>0)snacks++;popSnd();burst(e.x,1.2,e.z,0,12);scene.remove(e.group);ents.splice(i,1);spawnKind('starPick');continue}
+    if(e.kind==='donutPick'){score+=25;donuts++;if(FX.snackRainT>0)snacks++;popSnd();burst(e.x,1.2,e.z,0,12);scene.remove(e.group);ents.splice(i,1);spawnKind('donutPick');continue}
     if(e.kind==='chest'){score+=50;popSnd();say('🎁 Dream treasure! +50');burst(e.x,1,e.z,0,20);scene.remove(e.group);ents.splice(i,1);spawnKind('chest');continue}
     if(e.kind==='npc'||e.kind==='creature'){giggleSnd();if(e.npc)say(e.npc.n+': "'+pick(LINES)+'"');[px,pz]=collide(px+(px-e.x)*0.4,pz+(pz-e.z)*0.4)}
    }}
   stepParts(dt);
   /* HUD */
   el('zone').textContent=THEMES[themeIdx].n+' ('+timeMode+')';el('view').textContent=view;el('sprite').textContent=form;
-  el('score').textContent=FX.munchT>0?(snacks+' snacks'):score;el('donuts').textContent=donuts;el('orbs').textContent=orbs;el('dist').textContent=Math.floor(dist);
-  el('ctrl').textContent=ctrl;el('ng').textContent=ng>1?'· NG+'+ng:'';el('fill').style.width=meter+'%';el('fill2').style.width=trip+'%';
+  el('score').textContent=FX.snackRainT>0?(snacks+' snacks'):score;el('donuts').textContent=donuts;el('orbs').textContent=orbs;el('dist').textContent=Math.floor(dist);
+  el('ctrl').textContent=ctrl;el('ng').textContent=ng>1?'· NG+'+ng:'';el('fill').style.width=meter+'%';el('fill2').style.width=dream+'%';
  }
  /* camera */
  tpModel.visible=(view!=='FIRST-PERSON');
@@ -439,7 +527,9 @@ function loop(){requestAnimationFrame(loop);const dtR=Math.min(clock.getDelta(),
  else if(view==='THIRD-PERSON'){const bx=px+Math.sin(yaw)*5.2,bz=pz+Math.cos(yaw)*5.2;camera.position.set(bx,eyeH+1.6,bz);camera.lookAt(px,1.4,pz);vm.visible=false}
  else{const dx=px,dz=pz+12;camera.position.set(dx,15,dz);camera.lookAt(px,0,pz);vm.visible=false}
  if(FX.giggleT>0)camera.rotation.z+=Math.sin(frame*0.02)*0.02;
- renderer.render(scene,camera);
+ if(FX.vortexT>0)camera.rotation.z+=easeWindow(18-FX.vortexT,18)*0.22*Math.sin(frame*0.008);
+ if(FX.kaleidoK>0.005){renderer.setRenderTarget(kaleidoRT);renderer.render(scene,camera);renderer.setRenderTarget(null);kaleidoMat.uniforms.uMix.value=FX.kaleidoK;renderer.render(kaleidoScene,kaleidoCam)}
+ else renderer.render(scene,camera);
  if(!window.__ready&&texOk+texFail>=TEX_TOTAL){window.__ready=true}
 }
 applyZone();
@@ -452,10 +542,10 @@ window.__game={
  setView:(v)=>{view=v},
  setForm:(f)=>setForm(f),
  setCamera:(x,z,yaw_,pitch_)=>{px=x;pz=z;if(yaw_!==undefined)yaw=yaw_;if(pitch_!==undefined)pitch=pitch_},
- state:()=>({version:VERSION,zone:THEMES[themeIdx].n,view,form,score,orbs,dist:Math.floor(dist),texOk,texFail,texReady:!!window.__texReady,errors:window.__errors,ents:ents.length,snacks}),
+ state:()=>({version:VERSION,zone:THEMES[themeIdx].n,view,form,score,orbs,dist:Math.floor(dist),texOk,texFail,texReady:!!window.__texReady,errors:window.__errors,ents:ents.length,snacks,fov:+camera.fov.toFixed(0),mirror:cv.style.transform||''}),
  forceFX:(n)=>startFX(n),
- expireFX:(n)=>{if(n==='MUNCHIES')FX.munchT=0.01;if(n==='TIME DILATION')FX.timeDilT=0.01;if(n==='THE GIGGLES')FX.giggleT=0.01;if(n==='COTTONMOUTH')FX.cottonT=0.01;if(n==='DEEP THOUGHTS')FX.deepT=0.01;if(n==='SNACK ATTACK'&&FX.snack)FX.snack.t=0.01;if(n==='COUCH LOCK')FX.couchT=0.01;if(n==='THE TREES ARE WATCHING')FX.watchT=0.01},
- fx:()=>({munch:Math.round(FX.munchT),timeDil:Math.round(FX.timeDilT),giggle:Math.round(FX.giggleT),cotton:Math.round(FX.cottonT),deep:Math.round(FX.deepT),snack:FX.snack?{x:+FX.snack.x.toFixed(1),z:+FX.snack.z.toFixed(1),t:Math.round(FX.snack.t)}:null,couch:Math.round(FX.couchT),watch:Math.round(FX.watchT),snacks,tempo,juice:FX.juiceBox?{x:+FX.juiceBox.x.toFixed(1),z:+FX.juiceBox.z.toFixed(1)}:null,eyes:FX.eyes.length,food:munchFood.length}),
+ expireFX:(n)=>{if(n==='SNACK RAIN')FX.snackRainT=0.01;if(n==='SLOW DREAM')FX.slowT=0.01;if(n==='GIGGLE DREAM')FX.giggleT=0.01;if(n==='CANDY DESERT')FX.desertT=0.01;if(n==='DREAM THOUGHTS')FX.deepT=0.01;if(n==='DONUT PORTAL'&&FX.donut)FX.donut.t=0.01;if(n==='DREAM DRIFT')FX.driftT=0.01;if(n==='THE TREES ARE AWAKE')FX.awakeT=0.01;if(n==='KALEIDOSCOPE')FX.kaleidoT=0.01;if(n==='NEON PULSE')FX.pulseT=0.01;if(n==='RAINBOW DRIFT')FX.rainbowT=0.01;if(n==='VORTEX')FX.vortexT=0.01;if(n==='MIRROR DREAM')FX.mirrorT=0.01;if(n==='LASER DREAM')FX.laserT=0.01;if(n==='FRACTAL BLOOM')FX.fractalT=0.01;if(n==='BREATHING WORLD')FX.breathT=0.01;if(n==='TUNNEL OF LIGHT')FX.tunnelT=0.01},
+ fx:()=>({snackRain:Math.round(FX.snackRainT),slow:Math.round(FX.slowT),giggle:Math.round(FX.giggleT),desert:Math.round(FX.desertT),deep:Math.round(FX.deepT),donut:FX.donut?{x:+FX.donut.x.toFixed(1),z:+FX.donut.z.toFixed(1),t:Math.round(FX.donut.t)}:null,drift:Math.round(FX.driftT),awake:Math.round(FX.awakeT),kaleido:Math.round(FX.kaleidoT),kaleidoK:+FX.kaleidoK.toFixed(2),pulse:Math.round(FX.pulseT),rainbow:Math.round(FX.rainbowT),vortex:Math.round(FX.vortexT),mirror:Math.round(FX.mirrorT),laser:Math.round(FX.laserT),fractal:Math.round(FX.fractalT),breath:Math.round(FX.breathT),tunnel:Math.round(FX.tunnelT),breathS:(()=>{const t=ents.find(e=>e.kind==='tree');return t&&t.group?+t.group.scale.x.toFixed(2):0})(),snacks,tempo,juice:FX.juiceBox?{x:+FX.juiceBox.x.toFixed(1),z:+FX.juiceBox.z.toFixed(1)}:null,eyes:FX.eyes.length,food:rainFood.length}),
  treePos:()=>{const t=ents.find(e=>e.kind==='tree');return t?{x:+t.x.toFixed(1),z:+t.z.toFixed(1)}:null},
  ready:()=>!!window.__ready};
 </script></body></html>
